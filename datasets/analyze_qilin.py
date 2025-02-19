@@ -53,7 +53,7 @@ def get_engage_data(x):
 def cal_click_browse(data, info):
     n = data.shape[0]
 
-    search_result_details = data[f'{info}_result_details']
+    search_result_details = data[f'{info}_result_details_with_idx']
     avg_browsing_depth = search_result_details.apply(cal_max_depth).mean()
     avg_first_click_pos = search_result_details.apply(cal_first_click_pos).mean()
 
@@ -81,18 +81,18 @@ def cal_click_browse(data, info):
 def cal_ctr_position(data, info):
     data = data.sort_values(by='begin_time')
     fea_prefix = 'search' if info == 'search' else 'rec'
-    fea_name = f'{fea_prefix}_result_details'
+    fea_name = f'{fea_prefix}_result_details_with_idx'
     result_details = data[fea_name].tolist()
-    session_ids = data['session_id'].tolist()
+    session_idxs = data['session_idx'].tolist()
     session_dict, session_position_dict, position_dict = {}, {}, {}
     for idx, result_detail in enumerate(result_details):
         detail = json.loads(result_detail)
-        session_id = session_ids[idx]
+        session_idx = session_idxs[idx]
 
-        if session_id not in session_dict:
-            session_dict[session_id] = []
-        session_dict[session_id].append(1)
-        session_position = len(session_dict[session_id])
+        if session_idx not in session_dict:
+            session_dict[session_idx] = []
+        session_dict[session_idx].append(1)
+        session_position = len(session_dict[session_idx])
         session_position = session_position if session_position <= 10 else 11
         if session_position not in session_position_dict:
             session_position_dict[session_position] = [0, 0]
@@ -127,11 +127,9 @@ def cal_ctr_position(data, info):
 
 def process_arrow_to_csv_rec(e):
     # 1. trim into int
-    for key in ['rec_result_details']:
+    for key in ['rec_result_details_with_idx']:
         for sub_e in e[key]:
             for subkey in ['position', 'click', 'like', 'comment', 'collect', 'share', 'request_timestamp']:
-                if subkey == 'request_timestamp':
-                    sub_e[subkey] = sub_e[subkey] / 1000  # rec timestamp unify
                 sub_e[subkey] = int(sub_e[subkey])
 
             if np.isnan(sub_e['page_time']) or sub_e['page_time'] < 0.0:
@@ -139,7 +137,7 @@ def process_arrow_to_csv_rec(e):
         e[key] = sorted(e[key], key=lambda x: x['request_timestamp'])
 
     # 2. list to json_str
-    for key in ['recent_clicked_note_ids', 'rec_result_details']:
+    for key in ['recent_clicked_note_idxs', 'rec_result_details_with_idx']:
         e[key] = json.dumps((e[key]))
 
     return e
@@ -147,8 +145,8 @@ def process_arrow_to_csv_rec(e):
 
 def process_arrow_to_csv_search(e):
     # 1. trim into int
-    for key in ['query_from_type', 'search_result_details']:
-        if key == 'search_result_details':
+    for key in ['query_from_type', 'search_result_details_with_idx']:
+        if key == 'search_result_details_with_idx':
             for sub_e in e[key]:
                 for subkey in ['position', 'click', 'like', 'comment', 'collect', 'share', 'search_timestamp']:
                     sub_e[subkey] = int(sub_e[subkey])
@@ -160,7 +158,7 @@ def process_arrow_to_csv_search(e):
                 e[key] = int(e[key])
 
     # 2. list to json_str
-    for key in ['recent_clicked_note_ids', 'search_result_details']:
+    for key in ['recent_clicked_note_idxs', 'search_result_details_with_idx']:
         e[key] = json.dumps((e[key]))
     return e
 
@@ -168,8 +166,8 @@ def process_arrow_to_csv_search(e):
 def process_arrow_to_csv_dqa(e):
     # 1. trim into int
     for key in ['query_from_type', 'is_like_clk', 'is_onebox_trace_clk', 'is_content_clk', 'is_experience_clk',
-                'search_result_details']:
-        if key == 'search_result_details':
+                'search_result_details_with_idx']:
+        if key == 'search_result_details_with_idx':
             for sub_e in e[key]:
                 for subkey in ['position', 'click', 'like', 'comment', 'collect', 'share', 'search_timestamp']:
                     sub_e[subkey] = int(sub_e[subkey])
@@ -181,7 +179,7 @@ def process_arrow_to_csv_dqa(e):
                 e[key] = int(e[key])
 
     # 2. list to json_str
-    for key in ['recent_clicked_note_ids', 'search_result_details', 'ref_note_id_list']:
+    for key in ['recent_clicked_note_idxs', 'search_result_details_with_idx', 'ref_note_idx_list']:
         if e[key] is not None:
             e[key] = json.dumps((e[key]))
         else:
@@ -217,25 +215,32 @@ def arrow_to_csv_final(base_directory):
     dqa_data_df = dqa_data.to_pandas()
 
     # dealing with invalid values: -1, null, NaN
-    search_data_df = search_data_df.fillna(-1).replace('', -1)
-    rec_data_df = rec_data_df.fillna(-1).replace('', -1)
-    dqa_data_df = dqa_data_df.fillna(-1).replace('', -1)
+    search_data_df = search_data_df.fillna(-1)
+    search_data_df = search_data_df.replace(r'^\s*$', -1, regex=True)  # 处理空字符串
 
-    search_data_df = search_data_df.sort_values(by=['session_id'])
+    rec_data_df = rec_data_df.fillna(-1)
+    rec_data_df = rec_data_df.replace(r'^\s*$', -1, regex=True)  # 处理空字符串
+
+    dqa_data_df = dqa_data_df.fillna(-1)
+    dqa_data_df = dqa_data_df.replace(r'^\s*$', -1, regex=True)  # 处理空字符串
+
+    search_data_df = search_data_df.sort_values(by=['session_idx'])
     search_data_df = search_data_df.loc[
-        search_data_df['search_result_details'].apply(get_first_result_time).sort_values().index]
+        search_data_df['search_result_details_with_idx'].apply(get_first_result_time).sort_values().index]
 
-    rec_data_df = rec_data_df.sort_values(by=['session_id'])
+    rec_data_df = rec_data_df.sort_values(by=['session_idx'])
     rec_data_df = rec_data_df.loc[
-        rec_data_df['rec_result_details'].apply(get_first_result_time_rec).sort_values().index]
+        rec_data_df['rec_result_details_with_idx'].apply(get_first_result_time_rec).sort_values().index]
 
-    dqa_data_df = dqa_data_df.sort_values(by=['session_id'])
+    dqa_data_df = dqa_data_df.sort_values(by=['session_idx'])
     dqa_data_df = dqa_data_df.loc[
-        dqa_data_df['search_result_details'].apply(get_first_result_time).sort_values().index]
+        dqa_data_df['search_result_details_with_idx'].apply(get_first_result_time).sort_values().index]
 
-    search_data_df.to_csv(f'{base_directory}/search/data.csv', index=False)
-    rec_data_df.to_csv(f'{base_directory}/recommendation/data.csv', index=False)
-    dqa_data_df.to_csv(f'{base_directory}/dqa/data.csv', index=False)
+    search_data_df.to_csv(f'datasets/toy_data/csv/search_toy.csv', index=False)
+    rec_data_df.to_csv(f'datasets/toy_data/csv/recommendation_toy.csv', index=False)
+    dqa_data_df.to_csv(f'datasets/toy_data/csv/dqa_toy.csv', index=False)
+
+
 
 
 def cal_transition_rate(data):
@@ -244,18 +249,18 @@ def cal_transition_rate(data):
     print(f'All request num={num}')
     user_session_dict = {}
     for _, row in data.iterrows():
-        session_id, user_id, begin_time, engage_data, \
-            request_type = row['session_id'], row['user_id'], row['begin_time'], row['engage_data'], row['type']
-        if user_id not in user_session_dict:
-            user_session_dict[user_id] = {}
-        if len(user_session_dict[user_id]) == 0:
-            user_session_dict[user_id] = []
-            user_session_dict[user_id].append([[begin_time, engage_data, request_type]])
+        session_idx, user_idx, begin_time, engage_data, \
+            request_type = row['session_idx'], row['user_idx'], row['begin_time'], row['engage_data'], row['type']
+        if user_idx not in user_session_dict:
+            user_session_dict[user_idx] = {}
+        if len(user_session_dict[user_idx]) == 0:
+            user_session_dict[user_idx] = []
+            user_session_dict[user_idx].append([[begin_time, engage_data, request_type]])
             continue
-        if (begin_time - user_session_dict[user_id][-1][-1][0] <= 1800):  # add new request into existing session
-            user_session_dict[user_id][-1].append([begin_time, engage_data, request_type])
+        if (begin_time - user_session_dict[user_idx][-1][-1][0] <= 1800):  # add new request into existing session
+            user_session_dict[user_idx][-1].append([begin_time, engage_data, request_type])
         else:  # add new session
-            user_session_dict[user_id].append([[begin_time, engage_data, request_type]])
+            user_session_dict[user_idx].append([[begin_time, engage_data, request_type]])
     print(len(user_session_dict))
 
     transition_dict = [0, 0, 0, 0, 0]
@@ -308,8 +313,8 @@ def cal_query_analysis(data):
     query_length_dict = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     query_length_engage_dict = {}
     for _, row in data.iterrows():
-        session_id, user_id, begin_time, engage_data, query, query_from_type = \
-            row['session_id'], row['user_id'], row['begin_time'], row['engage_data'], row['query'], row['query_from_type']
+        session_idx, user_idx, begin_time, engage_data, query, query_from_type = \
+            row['session_idx'], row['user_idx'], row['begin_time'], row['engage_data'], row['query'], row['query_from_type']
         query_from_type_dict[0] += 1
         query_from_type_dict[int(query_from_type)] += 1
 
@@ -325,16 +330,16 @@ def cal_query_analysis(data):
         query_length_engage_dict[q_len][1] += engage_data[1]
         query_length_engage_dict[q_len][2].append(engage_data[1])
 
-        if user_id not in user_session_dict:
-            user_session_dict[user_id] = {}
-        if len(user_session_dict[user_id]) == 0:
-            user_session_dict[user_id] = []
-            user_session_dict[user_id].append([[begin_time, engage_data, query]])
+        if user_idx not in user_session_dict:
+            user_session_dict[user_idx] = {}
+        if len(user_session_dict[user_idx]) == 0:
+            user_session_dict[user_idx] = []
+            user_session_dict[user_idx].append([[begin_time, engage_data, query]])
             continue
-        if (begin_time - user_session_dict[user_id][-1][-1][0] <= 1800):  # add new request into existing session
-            user_session_dict[user_id][-1].append([begin_time, engage_data, query])
+        if (begin_time - user_session_dict[user_idx][-1][-1][0] <= 1800):  # add new request into existing session
+            user_session_dict[user_idx][-1].append([begin_time, engage_data, query])
         else:  # add new session
-            user_session_dict[user_id].append([[begin_time, engage_data, query]])
+            user_session_dict[user_idx].append([[begin_time, engage_data, query]])
 
     # query source
     print(f'query source, n={query_from_type_dict[0]}')
@@ -398,7 +403,7 @@ def cal_query_analysis(data):
 
 
 def cal_hetero_results(data, note_type_dict, info):
-    result_details = data[f'{info}_result_details'].tolist()
+    result_details = data[f'{info}_result_details_with_idx'].tolist()
     image_imp_dict, video_imp_dict = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     image_click_dict, video_click_dict = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     for detail in result_details:
@@ -465,46 +470,46 @@ def analyze_qilin(base_directory):
     # 3. ctr with position & session position
     print('3. Print ctr w.r.t. ranking and session positions...')
     search_final_data = pd.concat([search_data, dqa_data], axis=0, ignore_index=True)
-    search_final_data['begin_time'] = search_final_data['search_result_details'].apply(lambda x: json.loads(x)[0]['search_timestamp'])
-    rec_data['begin_time'] = rec_data['rec_result_details'].apply(
+    search_final_data['begin_time'] = search_final_data['search_result_details_with_idx'].apply(lambda x: json.loads(x)[0]['search_timestamp'])
+    rec_data['begin_time'] = rec_data['rec_result_details_with_idx'].apply(
         lambda x: json.loads(x)[0]['request_timestamp'])
     cal_ctr_position(search_final_data, 'search')
     cal_ctr_position(rec_data, 'rec')
 
     # 4. transition rate
     print('4. Print transition rate...')
-    search_data['begin_time'] = search_data['search_result_details'].apply(lambda x: json.loads(x)[0]['search_timestamp'])
-    rec_data['begin_time'] = rec_data['rec_result_details'].apply(
+    search_data['begin_time'] = search_data['search_result_details_with_idx'].apply(lambda x: json.loads(x)[0]['search_timestamp'])
+    rec_data['begin_time'] = rec_data['rec_result_details_with_idx'].apply(
         lambda x: json.loads(x)[0]['request_timestamp'])
-    dqa_data['begin_time'] = dqa_data['search_result_details'].apply(
+    dqa_data['begin_time'] = dqa_data['search_result_details_with_idx'].apply(
         lambda x: json.loads(x)[0]['search_timestamp'])
 
     search_data['type'] = 'S'
     rec_data['type'] = 'R'
     dqa_data['type'] = 'S'
 
-    search_data['engage_data'] = search_data['search_result_details'].apply(get_engage_data)
-    rec_data['engage_data'] = rec_data['rec_result_details'].apply(get_engage_data)
-    dqa_data['engage_data'] = dqa_data['search_result_details'].apply(get_engage_data)
+    search_data['engage_data'] = search_data['search_result_details_with_idx'].apply(get_engage_data)
+    rec_data['engage_data'] = rec_data['rec_result_details_with_idx'].apply(get_engage_data)
+    dqa_data['engage_data'] = dqa_data['search_result_details_with_idx'].apply(get_engage_data)
 
-    search_data_ = search_data[['session_id', 'user_id', 'begin_time', 'engage_data', 'type']]
-    rec_data_ = rec_data[['session_id', 'user_id', 'begin_time', 'engage_data', 'type']]
-    dqa_data_ = dqa_data[['session_id', 'user_id', 'begin_time', 'engage_data', 'type']]
+    search_data_ = search_data[['session_idx', 'user_idx', 'begin_time', 'engage_data', 'type']]
+    rec_data_ = rec_data[['session_idx', 'user_idx', 'begin_time', 'engage_data', 'type']]
+    dqa_data_ = dqa_data[['session_idx', 'user_idx', 'begin_time', 'engage_data', 'type']]
 
     all_data = pd.concat([search_data_, rec_data_, dqa_data_], axis=0, ignore_index=True)
     cal_transition_rate(all_data)
 
     # 5. query analysis
     print('5. Print query analysis...')
-    search_data['begin_time'] = search_data['search_result_details'].apply(lambda x: json.loads(x)[0]['search_timestamp'])
-    dqa_data['begin_time'] = dqa_data['search_result_details'].apply(
+    search_data['begin_time'] = search_data['search_result_details_with_idx'].apply(lambda x: json.loads(x)[0]['search_timestamp'])
+    dqa_data['begin_time'] = dqa_data['search_result_details_with_idx'].apply(
         lambda x: json.loads(x)[0]['search_timestamp'])
 
-    search_data['engage_data'] = search_data['search_result_details'].apply(get_engage_data)
-    dqa_data['engage_data'] = dqa_data['search_result_details'].apply(get_engage_data)
+    search_data['engage_data'] = search_data['search_result_details_with_idx'].apply(get_engage_data)
+    dqa_data['engage_data'] = dqa_data['search_result_details_with_idx'].apply(get_engage_data)
 
-    search_data = search_data[['session_id', 'user_id', 'begin_time', 'engage_data', 'query', 'query_from_type']]
-    dqa_data = dqa_data[['session_id', 'user_id', 'begin_time', 'engage_data', 'query', 'query_from_type']]
+    search_data = search_data[['session_idx', 'user_idx', 'begin_time', 'engage_data', 'query', 'query_from_type']]
+    dqa_data = dqa_data[['session_idx', 'user_idx', 'begin_time', 'engage_data', 'query', 'query_from_type']]
     all_search_data = pd.concat([search_data, dqa_data], axis=0, ignore_index=True)
     cal_query_analysis(all_search_data)
 
