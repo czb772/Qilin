@@ -195,13 +195,20 @@ def get_first_result_time_rec(x):
     return json.loads(x)[0]['request_timestamp']
 
 
+def remove_cols(hf_data, cols):
+    for col in cols:
+        if col in hf_data.column_names:
+            hf_data = hf_data.remove_columns([col])
+    return hf_data
+
 def arrow_to_csv_final(base_directory):
     data = load_from_disk(base_directory)
-    search_1 = data['search_train']
-    search_2 = data['search_test']
-    rec_1 = data['recommendation_train']
-    rec_2 = data['recommendation_test']
-    dqa_data = data['dqa']
+    to_removed = ['bm25_results', 'dpr_results']
+    search_1 = remove_cols(data['search_train'], to_removed)
+    search_2 = remove_cols(data['search_test'], to_removed)
+    rec_1 = remove_cols(data['recommendation_train'], to_removed+['query', 'rec_results'])
+    rec_2 = remove_cols(data['recommendation_test'], to_removed+['query', 'rec_results'])
+    dqa_data = remove_cols(data['dqa'], to_removed)
 
     search_1 = search_1.map(process_arrow_to_csv_search)
     search_2 = search_2.map(process_arrow_to_csv_search)
