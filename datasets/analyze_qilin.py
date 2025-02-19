@@ -241,8 +241,6 @@ def arrow_to_csv_final(base_directory):
     dqa_data_df.to_csv(f'datasets/toy_data/csv/dqa_toy.csv', index=False)
 
 
-
-
 def cal_transition_rate(data):
     data = data.sort_values(by='begin_time')
     num = data.shape[0]
