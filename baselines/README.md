@@ -51,7 +51,7 @@ We provide several carefully implemented baseline models, each targeting differe
 
 ### Data and Model Preparation
 1. Dataset Setup:
-   - Download the Qilin dataset from Hugging Face
+   - Download the Qilin dataset from [Hugging Face](https://huggingface.co/THUIR)
    - Extract and place in the `../datasets` directory
    - Verify the dataset structure matches the documentation
 
