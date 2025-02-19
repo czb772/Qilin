@@ -1,0 +1,17 @@
+#vllm
+transformers
+torch
+datasets
+accelerate
+peft
+torch_optimizer
+joblib
+editdistance
+rank_bm25
+jieba
+scikit-learn
+tensorboard
+deepspeed
+pillow
+bitsandbytes
+gpustat

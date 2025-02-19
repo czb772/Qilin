@@ -1,0 +1,64 @@
+project_name: "recommendation_dcn"
+project_dir: "output_recommendation_dcn"
+trainer: dcn_trainer
+
+# Model Configuration
+model:
+  bert_model_name_or_path: "/mnt/ali-sh-1/usr/dongqian/qilinbaselines/output_recommendation_dpr/2025-02-08-07-08-28/bert_checkpoints"
+  model_name_or_path: "models/recommendation_dcn_model_epoch_71.pth"
+  tokenizer_name_or_path: "../model/bert-base-chinese/"  # Tokenizer path
+  load_from_new: false  # Whether to load from the latest checkpoint
+  lora_checkpoint_dir: "dcn_checkpoints/"  # LoRA checkpoint save path
+  gradient_checkpointing: true  # Enable gradient checkpointing to save GPU memory
+
+# Dataset Configuration
+datasets:
+  dataset_name_or_path: "../datasets/qilin/"  # Dataset path
+  train_data_processor: "DCNTrainingDataProcessor"  # Training data processor
+  tokenizer_name_or_path: "../model/bert-base-chinese/"
+  batch_size: 16  # Batch size
+  eval_batch_size: 1
+  negative_samples: 50  # Number of negative samples per query
+  max_length: 512  # Maximum sequence length
+  use_title: true  # Whether to use title
+  use_content: true  # Whether to use content
+  negative_pool: rec_result_details_with_idx
+  train_data_key: recommendation_train
+
+# Training Configuration
+training:
+  num_epochs: 100000  # Number of training epochs
+  eval_steps: 1000  # Evaluation steps
+  save_steps: 1000  # Save steps
+  eval_epochs: 1  # Evaluate every N epochs
+  save_epochs: 100  # Save model every N epochs
+
+# Optimizer Configuration
+optimizer: 
+  name: Lamb
+  kwargs:
+    lr: 1e-3
+    weight_decay: 0.01
+    betas: [0.9, 0.999]
+    eps: 1e-08
+
+# Learning Rate Scheduler Configuration
+scheduler:
+  name: LinearLR
+  kwargs:
+    total_iters: 100
+
+# Evaluation Configuration
+evaluation:
+  target_metric: "MRR@10"  # Target evaluation metric
+  output_dir: "eval_results"  # Evaluation results output directory
+  qrels_data_path: "../datasets/recommendation.test.qrels.csv"  # Evaluation data path
+  rerank_depth: 100000  # Reranking depth, set very large to ensure all documents in the recall pool are evaluated
+  # results_key: "bm25_results"  # Retrieved results to use
+  results_key: "rec_results"  # Use XHS exposure results
+  sample_num: 1000  # Number of evaluation samples, evaluate first {sample_num} samples
+  test_data_key: recommendation_test
+
+# Logger Configuration
+logger:
+  log_with: "tensorboard"  # Use tensorboard for training log recording

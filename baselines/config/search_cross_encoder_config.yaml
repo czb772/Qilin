@@ -1,0 +1,61 @@
+project_name: "search_cross_encoder"
+project_dir: "output_search_cross_encoder"
+trainer: cross_encoder_trainer
+
+# 模型配置
+model:
+  model_name_or_path: "../model/bert-base-chinese/"  # 基础模型
+  tokenizer_name_or_path: "../model/bert-base-chinese/"  # 分词器
+  load_from_new: false  # 是否加载最新检查点
+  lora_checkpoint_dir: "bert_checkpoints/"  # LoRA检查点保存路径
+  gradient_checkpointing: true  # 启用梯度检查点以节省显存
+
+# 数据集配置
+datasets:
+  dataset_name_or_path: "../datasets/qilin/"  # 数据集路径
+  train_data_processor: "CrossEncoderTrainingDataProcessor"  # 训练数据处理器
+  tokenizer_name_or_path: "../model/bert-base-chinese/"
+  batch_size: 80  # 批次大小
+  eval_batch_size: 1
+  max_length: 512  # 最大序列长度
+  negative_samples: 10  # 每个查询的负样本数量
+  use_title: true  # 是否使用标题
+  use_content: true  # 是否使用内容
+
+# 训练配置
+training:
+  num_epochs: 100000  # 训练轮数
+  eval_steps: 1000000  # 评估步数
+  save_steps: 1000000  # 保存步数
+  eval_epochs: 1  # 每隔多少轮进行一次评估
+  save_epochs: 1  # 每隔多少轮保存一次模型
+
+# 优化器配置
+optimizer: 
+  name: Lamb
+  kwargs:
+    lr: 1e-3
+    weight_decay: 0.0
+    betas: [0.9, 0.999]
+    eps: 1e-08
+
+# 学习率调度器配置
+scheduler:
+  name: LinearLR
+  kwargs:
+    total_iters: 10
+
+# 评估配置
+evaluation:
+  target_metric: "MRR@10"  # 目标评估指标
+  output_dir: "eval_results"  # 评估结果输出目录
+  qrels_data_path: "../datasets/search.test.qrels.csv"
+  rerank_depth: 100000  # 重排深度，设置很大，确保召回池中的所有文桇都被评估
+  # results_key: bm25_results
+  # results_key: dpr_results
+  results_key: search_results # 使用xhs的曝光结果
+  sample_num: 1000  # 评估样本数，选择前{sample_num}个样本进行评估
+
+# 日志配置
+logger:
+  log_with: "tensorboard"  # 使用tensorboard记录训练日志

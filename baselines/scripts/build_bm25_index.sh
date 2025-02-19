@@ -1,0 +1,1 @@
+java -cp $ANSERINI_JAR io.anserini.index.IndexCollection -threads 120 -collection JsonCollection -index datasets/qilin_notes_index -input datasets/qilin_notes_jsonl -storePositions -storeDocvectors -storeRaw -language zh

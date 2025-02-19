@@ -1,0 +1,64 @@
+project_name: "recommendation_cross_encoder"
+project_dir: "output_recommendation_cross_encoder"
+trainer: cross_encoder_trainer
+
+# Model Configuration
+model:
+  model_name_or_path: "../model/bert-base-chinese/"  # Base model
+  tokenizer_name_or_path: "../model/bert-base-chinese/"  # Tokenizer
+  load_from_new: false  # Whether to load from the latest checkpoint
+  lora_checkpoint_dir: "bert_checkpoints/"  # LoRA checkpoint save path
+  gradient_checkpointing: true  # Enable gradient checkpointing to save GPU memory
+
+# Dataset Configuration
+datasets:
+  dataset_name_or_path: "../datasets/qilin/"  # Dataset path
+  train_data_processor: "CrossEncoderTrainingDataProcessor"  # Training data processor
+  tokenizer_name_or_path: "../model/bert-base-chinese/"
+  batch_size: 512  # Batch size
+  eval_batch_size: 1
+  max_length: 512  # Maximum sequence length
+  negative_samples: 1  # Number of negative samples per query
+  use_title: true  # Whether to use title
+  use_content: true  # Whether to use content
+  negative_pool: rec_result_details_with_idx
+  train_data_key: recommendation_train
+
+# Training Configuration
+training:
+  num_epochs: 100000  # Number of training epochs
+  eval_steps: 1000000  # Evaluation steps
+  save_steps: 1000000  # Save steps
+  eval_epochs: 1  # Evaluate every N epochs
+  save_epochs: 1  # Save model every N epochs
+
+# Optimizer Configuration
+optimizer: 
+  name: Lamb
+  kwargs:
+    lr: 1e-3
+    weight_decay: 0.0
+    betas: [0.9, 0.999]
+    eps: 1e-08
+
+# Learning Rate Scheduler Configuration
+scheduler:
+  name: LinearLR
+  kwargs:
+    total_iters: 10
+
+# Evaluation Configuration
+evaluation:
+  target_metric: "MRR@10"  # Target evaluation metric
+  output_dir: "eval_results"  # Evaluation results output directory
+  qrels_data_path: "../datasets/recommendation.test.qrels.csv"
+  rerank_depth: 100000  # Reranking depth, set large to ensure all documents in the recall pool are evaluated
+  # results_key: bm25_results
+  # results_key: dpr_results
+  results_key: rec_results # Use XHS exposure results
+  sample_num: 1000  # Number of evaluation samples, select first {sample_num} samples for evaluation
+  test_data_key: recommendation_test
+
+# Logger Configuration
+logger:
+  log_with: "tensorboard"  # Use tensorboard to record training logs
