@@ -1,2 +1,67 @@
 # Qilin
-Resources and code for the Qilin dataset.
+
+Qilin is a large-scale multimodal dataset designed for advancing research in search, recommendation, and Retrieval-Augmented Generation (RAG) systems. This repository contains the official implementation of the dataset paper, baseline models, and evaluation tools.
+
+## Dataset Overview
+
+Qilin provides comprehensive data for three main scenarios:
+
+### Search Dataset
+- Training set: 44,024 samples
+- Testing set: 6,192 samples
+- Features:
+  - Rich query metadata
+  - User interaction logs
+  - Ground clicked labels
+
+### Recommendation Dataset
+- Training set: 83,437 samples
+- Testing set: 11,115 samples
+- Features:
+  - Detailed user interaction history
+  - Candidate note pools
+  - Contextual features
+  - Ground clicked labels
+
+### Key Characteristics
+- Multiple content modalities (text, images, video thumbnails)
+- Rich user interaction data
+- Comprehensive evaluation metrics
+- Support for RAG system development
+
+## Repository Structure
+
+- `baselines/`: Implementation of state-of-the-art baseline models
+- `datasets/`: Dataset files and processing scripts
+  - `toy_data/`: Small sample dataset for quick exploration
+  - `qilin/`: Complete dataset (after downloading)
+
+## Getting Started
+
+### Installation
+
+```bash
+pip install -r baselines/requirements.txt
+```
+
+### Data and Model Preparation
+
+1. Download the Qilin dataset from [Hugging Face](https://huggingface.co/THUIR)
+2. Extract and place the dataset in the `datasets/qilin` directory
+3. Download the required models:
+   - [Qwen/Qwen2-VL-2B-Instruct](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct)
+   - [Qwen/Qwen2-VL-7B-Instruct](https://huggingface.co/Qwen/Qwen2-VL-7B-Instruct)
+   - [google-bert/bert-base-chinese](https://huggingface.co/google-bert/bert-base-chinese)
+4. Place the downloaded models in the `model` directory
+
+## Citation
+
+If you use Qilin in your research, please cite our paper:
+
+```
+To be updated
+```
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
