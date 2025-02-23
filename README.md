@@ -46,7 +46,7 @@ pip install -r baselines/requirements.txt
 
 ### Data and Model Preparation
 
-1. Download the Qilin dataset from [Hugging Face](https://huggingface.co/THUIR)
+1. Download the Qilin dataset from [Hugging Face](https://huggingface.co/THUIR/qilin)
 2. Extract and place the dataset in the `datasets/qilin` directory
 3. Download the required models:
    - [Qwen/Qwen2-VL-2B-Instruct](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct)
