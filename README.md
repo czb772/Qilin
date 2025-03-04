@@ -59,7 +59,15 @@ pip install -r baselines/requirements.txt
 If you use Qilin in your research, please cite our paper:
 
 ```
-To be updated
+@misc{chen2025qilinmultimodalinformationretrieval,
+      title={Qilin: A Multimodal Information Retrieval Dataset with APP-level User Sessions}, 
+      author={Jia Chen and Qian Dong and Haitao Li and Xiaohui He and Yan Gao and Shaosheng Cao and Yi Wu and Ping Yang and Chen Xu and Yao Hu and Qingyao Ai and Yiqun Liu},
+      year={2025},
+      eprint={2503.00501},
+      archivePrefix={arXiv},
+      primaryClass={cs.IR},
+      url={https://arxiv.org/abs/2503.00501}, 
+}
 ```
 
 ## License
