@@ -1,13 +1,13 @@
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0;">
   <div style="flex: 1; text-align: left;">
-    <img src="pics/xhs.png" alt="XHS Logo" width="150"/>
+    <img src="pics/xhs.png" alt="XHS Logo" width="100"/>
   </div>
   <div style="flex: 1; text-align: center;">
-    <img src="pics/icon.jpg" alt="Qilin Logo" width="200"/>
+    <img src="pics/icon.jpg" alt="Qilin Logo" width="150"/>
   </div>
   <div style="flex: 1; text-align: right;">
-    <img src="pics/thuir.png" alt="THUIR Logo" width="150"/>
+    <img src="pics/thuir.png" alt="THUIR Logo" width="100"/>
   </div>
 </div>
 
