@@ -1,6 +1,6 @@
 
 <div align="center">
-<img src="pics/merged.png" alt="Qilin Logo" width="400"/>
+<img src="pics/icon.jpg" alt="Qilin Logo" width="200"/>
 </div>
 
 # Qilin
