@@ -178,7 +178,7 @@ class DenseRetrievalRerankingTestDataProcessor:
         notes = []
         note_idxs = []
         search_idxs = []
-
+        print(batch)
         for item in batch:
             print(item)
             query = item["query"]
