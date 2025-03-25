@@ -6,7 +6,7 @@ import pandas as pd
 from PIL import Image
 from utils import *
 from transformers import AutoTokenizer, AutoProcessor
-from datasets import load_from_disk, load_dataset
+from datasets import load_dataset
 from torch.utils.data import DataLoader
 from registry import register_class
 @register_class
@@ -16,7 +16,7 @@ class DenseRetrievalTrainingDataProcessor:
         Data processor class for loading and processing data.
 
         Args:
-            data_path (str): Dataset path (supports load_from_disk format).
+            data_path (str): Dataset path (supports load_dataset format).
             tokenizer_name (str): Name of the pretrained tokenizer.
             batch_size (int): Batch size.
             max_length (int): Maximum length for tokenizer.
@@ -51,9 +51,8 @@ class DenseRetrievalTrainingDataProcessor:
         Returns:
             datasets.Dataset: The loaded dataset.
         """
-        dataset = load_from_disk(self.data_path)
-        self.corpus = dataset['notes']
-        self.dataset = dataset[self.train_data_key]
+        self.corpus = load_dataset("THUIR/Qilin", 'notes')['train']
+        self.dataset = load_dataset("THUIR/Qilin", self.train_data_key)['train']
 
     def get_note_content(self, note_idx):
         ret = ''
@@ -159,9 +158,9 @@ class DenseRetrievalRerankingTestDataProcessor:
         self.dataset = self.load_data()
 
     def load_data(self):
-        dataset = load_from_disk(self.data_path)
-        self.corpus = dataset['notes']
-        data = dataset[self.test_data_key]
+        self.corpus = load_dataset("THUIR/Qilin", 'notes')['train']
+        # data = dataset[self.test_data_key]
+        data = load_dataset("THUIR/Qilin", self.test_data_key)['train']
         data = data.select(range(min(self.sample_num, len(data))))
         data = data.shard(num_shards=self.num_processes, index=self.local_rank, contiguous=True)
         return data
@@ -241,7 +240,7 @@ class NoteDataProcessor:
         Note data processor class for loading and processing passage data.
 
         Args:
-            data_path (str): Dataset path (supports load_from_disk format).
+            data_path (str): Dataset path (supports load_dataset format).
             tokenizer_name (str): Name of the pretrained tokenizer.
             batch_size (int): Batch size.
             max_length (int): Maximum length for tokenizer.
@@ -270,8 +269,8 @@ class NoteDataProcessor:
         Returns:
             datasets.Dataset: The loaded dataset.
         """
-        dataset = load_from_disk(self.data_path)['notes'].shard(num_shards=self.num_processes, index=self.local_rank, contiguous=True)
-        self.corpus = load_from_disk(self.data_path)['notes']
+        dataset = load_dataset("THUIR/Qilin", 'notes')['train'].shard(num_shards=self.num_processes, index=self.local_rank, contiguous=True)
+        self.corpus = load_dataset("THUIR/Qilin", 'notes')['train']
         return dataset
     
     def get_note_content(self, note_idx):
@@ -325,7 +324,7 @@ class QueryDataProcessor:
         Query data processor class for loading and processing question data.
 
         Args:
-            data_path (str): Dataset path (supports load_from_disk format).
+            data_path (str): Dataset path (supports load_dataset format).
             tokenizer_name (str): Name of the pretrained tokenizer.
             batch_size (int): Batch size.
             max_length (int): Maximum length for tokenizer.
@@ -352,7 +351,7 @@ class QueryDataProcessor:
         Returns:
             datasets.Dataset: The loaded dataset.
         """
-        dataset = load_from_disk(self.data_path)['search_test'].shard(num_shards=self.num_processes, index=self.local_rank, contiguous=True)
+        dataset = load_dataset("THUIR/Qilin", 'search_test')['train'].shard(num_shards=self.num_processes, index=self.local_rank, contiguous=True)
         return dataset
 
     def collate_fn(self, batch):
@@ -427,10 +426,9 @@ class DCNTrainingDataProcessor:
         """
         Load dataset from disk
         """
-        dataset = load_from_disk(self.data_path)
-        self.corpus = dataset['notes']
-        self.dataset = dataset[self.train_data_key]
-        self.user_features = dataset['user_feat']
+        self.corpus = load_dataset("THUIR/Qilin", 'notes')['train']
+        self.dataset = load_dataset("THUIR/Qilin", self.train_data_key)['train']
+        self.user_features = load_dataset("THUIR/Qilin", 'user_feat')['train']
 
     def get_note_dense_features(self, note_idx):
         """
@@ -630,9 +628,8 @@ class CrossEncoderTrainingDataProcessor:
             self.tokenizer.padding_side = 'right'
 
     def load_data(self):
-        dataset = load_from_disk(self.data_path)
-        self.corpus = dataset['notes']
-        self.dataset = dataset[self.train_data_key]
+        self.corpus = load_dataset("THUIR/Qilin", 'notes')['train']
+        self.dataset = load_dataset("THUIR/Qilin", self.train_data_key)['train']
 
     def get_note_content(self, note_idx):
         ret = ''
@@ -719,12 +716,11 @@ class DCNTestDataProcessor(DCNTrainingDataProcessor):
 
     def load_data(self):
         """
-        Load dataset from disk
+        Load dataset from Huggingface
         """
-        dataset = load_from_disk(self.data_path)
-        self.corpus = dataset['notes']
-        self.user_features = dataset['user_feat']
-        data = dataset[self.test_data_key]
+        self.corpus = load_dataset("THUIR/Qilin", 'notes')['train']
+        self.user_features = load_dataset("THUIR/Qilin", 'user_feat')['train']
+        data = load_dataset("THUIR/Qilin", self.test_data_key)['train']
         data = data.select(range(min(self.sample_num, len(data))))
         self.dataset = data.shard(num_shards=self.num_processes, index=self.local_rank, contiguous=True)
 
@@ -846,9 +842,8 @@ class CrossEncoderTestDataProcessor:
         self.dataset = self.load_data()
 
     def load_data(self):
-        dataset = load_from_disk(self.data_path)
-        self.corpus = dataset['notes']
-        data = dataset[self.test_data_key]
+        self.corpus = load_dataset("THUIR/Qilin", 'notes')['train']
+        data = load_dataset("THUIR/Qilin", self.test_data_key)['train']
         data = data.select(range(min(self.sample_num, len(data))))
         data = data.shard(num_shards=self.num_processes, index=self.local_rank, contiguous=True)
         return data
@@ -938,9 +933,8 @@ class VLMCrossEncoderTrainingDataProcessor:
         return default_image
     
     def load_data(self):
-        dataset = load_from_disk(self.data_path)
-        self.corpus = dataset['notes']
-        self.dataset = dataset[self.train_data_key]
+        self.corpus = load_dataset("THUIR/Qilin", 'notes')['train']
+        self.dataset = load_dataset("THUIR/Qilin", self.train_data_key)['train']
 
     def get_note_content(self, note_idx):
         note = self.corpus[note_idx]
@@ -1081,9 +1075,8 @@ class VLMCrossEncoderTestDataProcessor(VLMCrossEncoderTrainingDataProcessor):
         self.default_image = self._create_default_image()
 
     def load_data(self):
-        dataset = load_from_disk(self.data_path)
-        self.corpus = dataset['notes']
-        data = dataset[self.test_data_key]
+        self.corpus = load_dataset("THUIR/Qilin", 'notes')['train']
+        data = load_dataset("THUIR/Qilin", self.test_data_key)['train']
         data = data.select(range(min(self.sample_num, len(data))))
         data = data.shard(num_shards=self.num_processes, index=self.local_rank, contiguous=True)
         return data
