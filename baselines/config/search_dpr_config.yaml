@@ -54,6 +54,9 @@ evaluation:
   qrels_data_path: "../datasets/search.test.qrels.csv"
   # qrels_data_path: "../datasets/dqa.qrels.csv"
   evaluate_type: rerank  # Evaluation type
+  rerank_depth: 1000  # Reranking depth
+  results_key: "search_results"  # Retrieved results to use
+  sample_num: 1000  # Number of evaluation samples, evaluate first {sample_num} samples
 
 # Logger Configuration
 logger:
