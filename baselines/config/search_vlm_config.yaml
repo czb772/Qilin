@@ -10,6 +10,7 @@ model:
   lora_checkpoint_dir: "vlm_checkpoints/"  # LoRA checkpoint save path
   gradient_checkpointing: true  # Enable gradient checkpointing to save GPU memory
   load_in_4bit: true
+  user_lora: true
 
 # Dataset Configuration
 datasets:
