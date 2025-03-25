@@ -159,7 +159,6 @@ class DenseRetrievalRerankingTestDataProcessor:
 
     def load_data(self):
         self.corpus = load_dataset("THUIR/Qilin", 'notes')['train']
-        # data = dataset[self.test_data_key]
         data = load_dataset("THUIR/Qilin", self.test_data_key)['train']
         data = data.select(range(min(self.sample_num, len(data))))
         data = data.shard(num_shards=self.num_processes, index=self.local_rank, contiguous=True)
@@ -178,6 +177,9 @@ class DenseRetrievalRerankingTestDataProcessor:
         notes = []
         note_idxs = []
         search_idxs = []
+        if self.local_rank==0:
+            print('batch size:', len(batch))
+            print('batch:', batch)
         for item in batch:
             query = item["query"]
             search_idx = item['search_idx'] if 'search_idx' in item else item['request_idx']
