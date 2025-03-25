@@ -53,6 +53,7 @@ evaluation:
   top_k: 100  # Retrieve top-k results
   qrels_data_path: "../datasets/search.test.qrels.csv"
   # qrels_data_path: "../datasets/dqa.qrels.csv"
+  evaluate_type: rerank  # Evaluation type
 
 # Logger Configuration
 logger:
