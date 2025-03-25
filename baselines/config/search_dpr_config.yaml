@@ -57,6 +57,7 @@ evaluation:
   rerank_depth: 1000  # Reranking depth
   results_key: "search_results"  # Retrieved results to use
   sample_num: 1000  # Number of evaluation samples, evaluate first {sample_num} samples
+  test_data_key: search_test
 
 # Logger Configuration
 logger:

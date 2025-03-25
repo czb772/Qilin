@@ -178,9 +178,7 @@ class DenseRetrievalRerankingTestDataProcessor:
         notes = []
         note_idxs = []
         search_idxs = []
-        # print(batch)
         for item in batch:
-            # print(item)
             query = item["query"]
             search_idx = item['search_idx'] if 'search_idx' in item else item['request_idx']
             # Use specified recall results
