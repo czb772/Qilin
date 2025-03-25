@@ -177,9 +177,7 @@ class DenseRetrievalRerankingTestDataProcessor:
         notes = []
         note_idxs = []
         search_idxs = []
-        if self.local_rank==0:
-            print('batch size:', len(batch))
-            print('batch:', batch)
+        batch = [batch]
         for item in batch:
             query = item["query"]
             search_idx = item['search_idx'] if 'search_idx' in item else item['request_idx']
