@@ -180,6 +180,7 @@ class DenseRetrievalRerankingTestDataProcessor:
         search_idxs = []
 
         for item in batch:
+            print(item)
             query = item["query"]
             search_idx = item['search_idx'] if 'search_idx' in item else item['request_idx']
             # Use specified recall results
