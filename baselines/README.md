@@ -2,6 +2,10 @@
 
 A comprehensive collection of state-of-the-art baseline model implementations for the Qilin multimodal search, recommendation and Retrieval-Augmented Generation (RAG)dataset. This repository provides researchers and practitioners with robust benchmarks for evaluating and developing multimodal search and recommendation systems.
 
+## 📢 News
+
+**[2024-03-18]** 🔥Image resources are now available for download through [Tsinghua Cloud](https://cloud.tsinghua.edu.cn/d/af72ab5dbba1460da6c0/)! 
+
 ## Overview
 
 Qilin is an extensive dataset specifically designed for advancing research in multimodal search and recommendation tasks. It encompasses:
