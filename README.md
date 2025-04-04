@@ -7,6 +7,10 @@
 
 Qilin is a large-scale multimodal dataset designed for advancing research in search, recommendation, and Retrieval-Augmented Generation (RAG) systems. This repository contains the official implementation of the dataset paper, baseline models, and evaluation tools.
 
+## 📢 News
+
+**[2024-03-18]** 🔥Image resources are now available for download through [Tsinghua Cloud](https://cloud.tsinghua.edu.cn/d/af72ab5dbba1460da6c0/)! 
+
 ## Dataset Overview
 
 Qilin provides comprehensive data for three main scenarios:
