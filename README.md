@@ -9,7 +9,7 @@ Qilin is a large-scale multimodal dataset designed for advancing research in sea
 
 ## 📢 News
 **[2025-04-05]** 🎉 [Qilin](https://arxiv.org/abs/2503.00501) is accepted to SIGIR 2025! Huge thanks to all collaborators!
-**[2024-03-27]** 🚀 Our Hugging Face model surpasses 1,000 downloads! Thank you for your support!
+**[2024-03-27]** 🚀 Qilin surpasses 1,000 downloads on Huggingface! Thank you for your support!
 **[2024-03-18]** 🔥Image resources are now available for download through [Tsinghua Cloud](https://cloud.tsinghua.edu.cn/d/af72ab5dbba1460da6c0/)! 
 
 ## Dataset Overview
