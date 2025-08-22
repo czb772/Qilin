@@ -1,3 +1,12 @@
+"""
+VLM搜索训练器 - 用于训练视觉语言模型进行搜索任务
+主要功能：
+1. 训练VLM模型理解查询和文档的语义关系
+2. 支持对比学习，通过正负样本训练模型区分相关和不相关内容
+3. 集成DeepSpeed进行分布式训练和内存优化
+4. 支持LoRA微调，减少显存占用
+"""
+
 from accelerate import Accelerator
 from evaluator import *
 from dataset_factory import *
@@ -18,9 +27,13 @@ import time
 from glob import glob
 from model_factory import *
 
+# 优化器映射表 - 支持多种优化器选择
 optimizer_class = {"AdamW": FusedAdam, "Lamb": optim.Lamb, "DeepSpeedCPUAdam": DeepSpeedCPUAdam}
+# 学习率调度器映射表
 scheduler_class = {"CosineAnnealingLR": CosineAnnealingLR, "LinearLR": LinearLR}
+
 def dataset_class(class_name):
+    """根据类名获取数据集类"""
     cls = registry.get_class(class_name)
     if cls:
         return cls
@@ -28,17 +41,30 @@ def dataset_class(class_name):
         raise ValueError(f"Class {class_name} not found")
 
 class BaseTrainer:
-    """Base Trainer Class"""
+    """
+    基础训练器类 - 提供训练的基础框架
+    包含环境设置、模型初始化、数据加载、优化器配置等通用功能
+    """
     def __init__(self, config):
+        """
+        初始化训练器
+        Args:
+            config: 训练配置字典，包含模型、数据、训练等所有参数
+        """
         self.config = config
-        self.setup_environment()
-        self.setup_tracking()
-        self.setup_model()
-        self.setup_data()
-        self.setup_optimization()
+        self.setup_environment()  # 设置训练环境（Accelerator、分布式等）
+        self.setup_tracking()     # 设置指标跟踪
+        self.setup_model()        # 初始化模型
+        self.setup_data()         # 设置数据加载
+        self.setup_optimization() # 设置优化器和调度器
 
     def setup_environment(self):
-        """Set up training environment"""
+        """
+        设置训练环境
+        - 初始化Accelerator用于分布式训练
+        - 设置日志记录和项目跟踪
+        - 获取当前进程信息
+        """
         self.accelerator = Accelerator(
             log_with=self.config['logger']['log_with'], 
             project_dir=self.config['project_dir']
@@ -47,39 +73,52 @@ class BaseTrainer:
             print_args(self.config)
         self.accelerator.init_trackers(project_name=f'{self.config["project_name"]}')
         
-        self.local_rank = self.accelerator.process_index  # Current device number
-        self.num_processes = self.accelerator.num_processes
-        self.step = 0
+        self.local_rank = self.accelerator.process_index  # 当前设备编号
+        self.num_processes = self.accelerator.num_processes  # 总进程数
+        self.step = 0  # 训练步数
 
     def setup_model(self):
-        """Initialize model - to be implemented by subclass"""
+        """初始化模型 - 由子类实现具体逻辑"""
         raise NotImplementedError
 
     def setup_data(self):
-        """Set up data loading - to be implemented by subclass"""
+        """设置数据加载 - 由子类实现具体逻辑"""
         raise NotImplementedError
 
     def setup_optimization(self):
-        """Set up optimizer and scheduler"""
+        """
+        设置优化器和学习率调度器
+        - 加载优化器配置
+        - 加载学习率调度器
+        - 准备训练环境
+        """
         self.load_optimizer()
         self.load_scheduler()
         self.prepare_for_training()
 
     def setup_tracking(self):
-        """Set up metric tracking"""
-        self.target_metric = self.config['evaluation']['target_metric']
-        self.best_metric = -1
+        """设置指标跟踪 - 用于记录最佳模型"""
+        self.target_metric = self.config['evaluation']['target_metric']  # 目标评估指标
+        self.best_metric = -1  # 最佳指标值
 
     def load_optimizer(self):
-        """Load optimizer"""
+        """
+        加载优化器
+        - 根据配置选择优化器类型（AdamW、Lamb等）
+        - 只对需要梯度的参数进行优化
+        """
         optimizer_config = self.config['optimizer']
         optimizer_name = optimizer_config['name']
+        # 只选择需要梯度的参数
         params = [(k, v) for k, v in self.model.model.named_parameters() if v.requires_grad]
         params = {'params': [v for k, v in params]}
         self.optimizer = optimizer_class[optimizer_name]([params], **optimizer_config['kwargs'])
 
     def load_scheduler(self):
-        """Load learning rate scheduler"""
+        """
+        加载学习率调度器
+        - 支持余弦退火、线性调度等
+        """
         scheduler_config = self.config['scheduler']
         scheduler_name = scheduler_config['name']
         self.scheduler = scheduler_class[scheduler_name](
@@ -88,11 +127,15 @@ class BaseTrainer:
         )
 
     def prepare_for_training(self):
-        """Prepare for training - to be implemented by subclass"""
+        """准备训练环境 - 由子类实现具体逻辑"""
         raise NotImplementedError
 
     def train(self):
-        """Training process"""
+        """
+        主训练循环
+        - 按epoch进行训练
+        - 每个epoch结束后进行评估（可选）
+        """
         # self.evaluate()
         for epoch in range(1, self.config['training']['num_epochs']):
             self.train_epoch(epoch)
@@ -122,8 +165,21 @@ class BaseTrainer:
         return all_tensors
 
 class DenseRetrievalTrainer(BaseTrainer):
-    """Dense Retrieval Model Trainer"""
+    """
+    密集检索模型训练器 - 专门用于训练VLM进行搜索任务
+    主要特点：
+    1. 支持对比学习，通过正负样本训练模型
+    2. 使用DeepSpeed进行分布式训练和内存优化
+    3. 支持LoRA微调，减少显存占用
+    4. 自动处理checkpoint的保存和加载
+    """
     def setup_model(self):
+        """
+        设置模型
+        - 处理之前的checkpoint
+        - 初始化密集检索模型
+        - 打印可训练参数统计
+        """
         self._handle_previous_checkpoints()
         self.model = DenseRetrievalModel(self.config)
         if self.accelerator.is_main_process:
@@ -873,7 +929,22 @@ class CrossEncoderTrainer(BaseTrainer):
 
 
 class VLMCrossEncoderTrainer(BaseTrainer):
-    """VLM cross-encoder model trainer"""
+    """
+    VLM交叉编码器训练器 - 专门用于训练视觉语言模型进行搜索重排序任务
+    
+    主要功能：
+    1. 训练VLM模型作为交叉编码器，对查询-文档对进行相关性评分
+    2. 使用二分类损失函数（BCEWithLogitsLoss）训练模型
+    3. 支持LoRA微调，减少显存占用
+    4. 自动处理checkpoint的保存和加载
+    5. 集成DeepSpeed进行分布式训练
+    
+    训练流程：
+    1. 输入：查询文本 + 文档内容（可能包含图像）
+    2. 模型：VLM交叉编码器，输出相关性分数
+    3. 损失：二分类交叉熵损失
+    4. 优化：AdamW优化器 + 学习率调度器
+    """
     def setup_model(self):
         self._handle_previous_checkpoints()
         self.model = VLMCrossEncoderModel(self.config)

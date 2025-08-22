@@ -1,3 +1,20 @@
+"""
+VLM搜索训练数据集工厂 - 处理训练和测试数据的加载、预处理和批处理
+
+主要功能：
+1. 加载Qilin数据集（包含查询、文档、图像等）
+2. 处理多模态数据（文本+图像）
+3. 构建训练样本（正负样本对）
+4. 支持对比学习和交叉编码器训练
+5. 自动处理图像加载和预处理
+
+数据集结构：
+- 查询（query）：用户搜索的关键词
+- 文档（notes）：包含标题、内容、图像等
+- 点击数据：用户对搜索结果的点击行为
+- 图像数据：文档相关的图像内容
+"""
+
 import os
 import torch
 import random
@@ -9,17 +26,35 @@ from transformers import AutoTokenizer, AutoProcessor
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from registry import register_class
+
 @register_class
 class DenseRetrievalTrainingDataProcessor:
+    """
+    密集检索训练数据处理器 - 用于对比学习训练
+    
+    主要功能：
+    1. 加载查询和文档数据
+    2. 构建正负样本对
+    3. 对文本进行tokenization
+    4. 支持负样本采样策略
+    
+    训练策略：
+    - 正样本：用户点击的文档
+    - 负样本：未点击的文档或随机采样的文档
+    - 对比学习：让模型学会区分相关和不相关内容
+    """
     def __init__(self, **kwargs):
         """
-        Data processor class for loading and processing data.
-
+        初始化数据处理器
+        
         Args:
-            data_path (str): Dataset path (supports load_dataset format).
-            tokenizer_name (str): Name of the pretrained tokenizer.
-            batch_size (int): Batch size.
-            max_length (int): Maximum length for tokenizer.
+            data_path (str): 数据集路径（支持load_dataset格式）
+            tokenizer_name (str): 预训练tokenizer名称
+            batch_size (int): 批次大小
+            max_length (int): tokenizer最大长度
+            negative_samples (int): 每个查询的负样本数量
+            use_title (bool): 是否使用文档标题
+            use_content (bool): 是否使用文档内容
         """
         data_path = kwargs.get('dataset_name_or_path')
         tokenizer_name = kwargs.get('tokenizer_name_or_path')
@@ -32,10 +67,12 @@ class DenseRetrievalTrainingDataProcessor:
         self.data_path = data_path
         self.batch_size = batch_size
         self.max_length = max_length
-        self.N = negative_samples
+        self.N = negative_samples  # 负样本数量
         self.train_data_key = kwargs.get('train_data_key', 'search_train')
         self.negative_pool = kwargs.get('negative_pool', 'search_result_details_with_idx')
         self.load_data()
+        
+        # 初始化tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name, trust_remote_code=True)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -47,14 +84,26 @@ class DenseRetrievalTrainingDataProcessor:
 
     def load_data(self):
         """
-        Load dataset from disk.
+        从磁盘加载数据集
+        
         Returns:
-            datasets.Dataset: The loaded dataset.
+            datasets.Dataset: 加载的数据集
         """
+        # 加载文档语料库
         self.corpus = load_dataset("THUIR/Qilin", 'notes')['train']
+        # 加载训练数据（包含查询和点击信息）
         self.dataset = load_dataset("THUIR/Qilin", self.train_data_key)['train']
 
     def get_note_content(self, note_idx):
+        """
+        获取文档内容
+        
+        Args:
+            note_idx (int): 文档索引
+            
+        Returns:
+            str: 文档的文本内容（标题+内容）
+        """
         ret = ''
         if self.use_title:
             ret += self.corpus[note_idx]['note_title']
@@ -64,18 +113,20 @@ class DenseRetrievalTrainingDataProcessor:
 
     def collate_fn(self, batch):
         """
-        Batch data processing function.
+        批处理数据函数
+        
         Args:
-            batch (list): Batch data.
+            batch (list): 批次数据
+            
         Returns:
-            Tuple[Dict, List]: Tokenized batch inputs and targets.
+            Tuple[Dict, List]: tokenized批次输入和目标
         """
         queries = [item["query"] for item in batch]
         notes = []
         note_idxs = []
 
         for item in batch:
-            # Randomly select an index from positives
+            # 从正样本中随机选择一个
             impression_result_details = item[self.negative_pool]
             positives = [impression_result['note_idx'] for impression_result in impression_result_details if impression_result['click'] == 1]
             positive_idx = random.randint(0, len(positives) - 1)
@@ -84,52 +135,58 @@ class DenseRetrievalTrainingDataProcessor:
             notes.append(positive_note)
             note_idxs.append(note_idx)
             
-            # Randomly select N indices from negatives
+            # 从负样本中随机选择N个
             negatives = [impression_result['note_idx'] for impression_result in impression_result_details if impression_result['click'] != 0]
             if len(negatives) < self.N:
-                # Randomly select from all notes
+                # 如果负样本不够，从所有文档中随机采样
                 negatives = negatives + random.sample(range(len(self.corpus)), k=self.N-len(negatives))
             else:
                 negatives = random.sample(negatives, k=self.N)
             notes.extend([self.get_note_content(note_idx) for note_idx in negatives])
             note_idxs.extend(negatives)
 
+        # 对查询和文档进行tokenization
         queries_tokenized = self.tokenizer(
             queries, 
             truncation=True, 
             padding=True, 
-            max_length=self.max_length, 
-            return_tensors="pt")
-        
-        notes_tokenized = self.tokenizer(
-            notes, 
-            truncation=True, 
-            padding=True, 
-            max_length=self.max_length, 
+            max_length=self.max_length,
             return_tensors="pt"
         )
-        queries_and_notes = queries + notes
-        merged_tokenized = self.tokenizer(
-            queries_and_notes, 
-            truncation=True, 
-            padding=True, 
-            max_length=self.max_length, 
-            return_tensors="pt")
         
-        # 返回分词后的问题和段落
-        return {'queries_tokenized':queries_tokenized, 'notes_tokenized':notes_tokenized, 'merged_tokenized':merged_tokenized}
+        notes_tokenized = self.tokenizer(
+            notes,
+            truncation=True,
+            padding=True,
+            max_length=self.max_length,
+            return_tensors="pt"
+        )
+        
+        # 合并查询和文档的tokenized数据
+        merged_tokenized = {}
+        for key in queries_tokenized.keys():
+            merged_tokenized[key] = torch.cat([queries_tokenized[key], notes_tokenized[key]], dim=0)
+        
+        return {
+            'queries_tokenized': queries_tokenized,
+            'notes_tokenized': notes_tokenized,
+            'merged_tokenized': merged_tokenized,
+            'note_idxs': note_idxs
+        }
 
     def get_dataloader(self):
         """
-        Get DataLoader.
+        获取数据加载器
+        
         Returns:
-            DataLoader: PyTorch DataLoader object.
+            DataLoader: PyTorch数据加载器
         """
         return DataLoader(
             self.dataset,
             batch_size=self.batch_size,
             shuffle=True,
             collate_fn=self.collate_fn,
+            num_workers=4
         )
     
 @register_class
@@ -902,6 +959,22 @@ class CrossEncoderTestDataProcessor:
     
 @register_class
 class VLMCrossEncoderTrainingDataProcessor:
+    """
+    VLM交叉编码器训练数据处理器 - 用于训练VLM模型进行搜索重排序
+    
+    主要功能：
+    1. 加载多模态数据（文本+图像）
+    2. 构建查询-文档对
+    3. 处理图像数据（加载、预处理、拼接）
+    4. 生成对话格式的输入
+    5. 支持正负样本构建
+    
+    训练策略：
+    - 正样本：用户点击的文档
+    - 负样本：未点击的文档
+    - 交叉编码器：直接对查询-文档对进行相关性评分
+    - 多模态：同时考虑文本和图像内容
+    """
     def __init__(self, **kwargs):
         data_path = kwargs.get('dataset_name_or_path')
         processor_name = kwargs.get('tokenizer_name_or_path')
@@ -919,6 +992,8 @@ class VLMCrossEncoderTrainingDataProcessor:
         self.train_data_key = kwargs.get('train_data_key', 'search_train')
         self.negative_pool = kwargs.get('negative_pool', 'search_result_details_with_idx')
         self.load_data()
+        # 去除路径末尾的斜杠以避免HuggingFace验证错误
+        processor_name = processor_name.rstrip('/')
         self.processor = AutoProcessor.from_pretrained(
             processor_name,
             max_pixels= 100 * 28 * 28,
@@ -941,7 +1016,8 @@ class VLMCrossEncoderTrainingDataProcessor:
         image_path = note['image_path']
         if len(image_path):
             try:
-                image_path = os.path.join('/mnt/ali-sh-1/usr/lihaitao/process_0106', image_path[0])
+                # 修改图像路径为本地路径
+                image_path = os.path.join('/data1/Qilin/datasets', image_path[0])
                 image = Image.open(image_path)
                 image = image.resize((1024, 1024))
                 image_size = image.size

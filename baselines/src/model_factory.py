@@ -1,3 +1,20 @@
+"""
+VLM搜索模型工厂 - 定义和实现各种用于搜索任务的模型
+
+主要功能：
+1. 定义基础模型类，提供通用的模型初始化和管理功能
+2. 实现密集检索模型（DenseRetrievalModel）- 用于对比学习
+3. 实现VLM交叉编码器模型（VLMCrossEncoderModel）- 用于重排序
+4. 支持LoRA微调，减少显存占用
+5. 集成BM25检索器作为基线方法
+
+模型架构：
+- 密集检索模型：双塔架构，分别编码查询和文档
+- VLM交叉编码器：单塔架构，联合编码查询-文档对
+- 支持多模态输入（文本+图像）
+- 使用LoRA进行参数高效微调
+"""
+
 from utils import *
 from datasets import load_from_disk, load_dataset
 from torch.utils.data import DataLoader
@@ -14,24 +31,44 @@ import torch
 import torch.nn as nn
 
 class BaseModel:
+    """
+    基础模型类 - 提供通用的模型初始化和管理功能
+    
+    主要功能：
+    1. 加载预训练模型和tokenizer
+    2. 配置模型参数（梯度检查点、LoRA等）
+    3. 冻结非交叉注意力参数
+    4. 提供模型保存和加载功能
+    """
     def __init__(self, config):
+        """
+        初始化基础模型
+        
+        Args:
+            config (dict): 模型配置字典
+        """
         self.model_config = config['model']
+        # 加载HuggingFace模型配置
         self.hf_model_config = AutoConfig.from_pretrained(self.model_config['model_name_or_path'])
+        # 加载tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_config['tokenizer_name_or_path'],
             trust_remote_code=True
         )
         
+        # 将配置中的参数应用到模型配置
         for key in self.model_config:
             self.hf_model_config.__dict__[key] = self.model_config[key]
             
         self.is_bert = 'bert' in self.model_config['model_name_or_path']
         self.model = self._create_model()
         
+        # 启用梯度检查点以节省显存
         if self.model_config['gradient_checkpointing']:
             self.model.gradient_checkpointing_enable()
             self.model.enable_input_require_grads()
             
+        # 对于非BERT模型，尝试冻结非交叉注意力参数
         if not self.is_bert:
             try:
                 self._freeze_non_crossattention_parameters()
@@ -39,60 +76,102 @@ class BaseModel:
                 print("freeze_non_crossattention_parameters failed")
 
 class DenseRetrievalModel(BaseModel):
+    """
+    密集检索模型 - 用于对比学习训练
+    
+    主要特点：
+    1. 双塔架构：分别编码查询和文档
+    2. 支持LoRA微调
+    3. 使用平均池化获取文档表示
+    4. 适用于对比学习训练策略
+    
+    训练目标：
+    - 让相关查询-文档对的相似度更高
+    - 让不相关查询-文档对的相似度更低
+    """
     def __init__(self, config):
         super().__init__(config)
         self.embedding_model = self.model
 
     def _create_model(self):
+        """
+        创建模型实例
+        
+        Returns:
+            torch.nn.Module: 模型实例
+        """
         if self.is_bert:
+            # BERT类模型
             model = AutoModel.from_pretrained(
                 self.model_config['model_name_or_path'],
                 config=self.hf_model_config,
                 trust_remote_code=True
             )
         else:
+            # 因果语言模型（如Qwen2-VL）
             model = AutoModelForCausalLM.from_pretrained(
                 self.model_config['model_name_or_path'],
                 config=self.hf_model_config,
                 attn_implementation='eager',
                 trust_remote_code=True
             )
+            # 冻结输入嵌入层
             model.base_model.get_input_embeddings().weight.requires_grad = False
             
+            # 设置LoRA
             self._setup_lora(model)
                 
         return model
 
     def _setup_lora(self, model):
+        """
+        设置LoRA微调
+        
+        Args:
+            model: 要添加LoRA的模型
+        """
         print(f"Try to load lora model from {self.model_config['lora_checkpoint_dir']}")
         if os.path.exists(os.path.join(self.model_config['lora_checkpoint_dir'], 'adapter_config.json')):
+            # 加载已有的LoRA适配器
             model.load_adapter(self.model_config['lora_checkpoint_dir'], 'retrieval')
             print("Load retrieval lora adapter from", self.model_config['lora_checkpoint_dir'])
         else:
+            # 创建新的LoRA适配器
             peft_config = LoraConfig(
-                lora_alpha=32,
-                lora_dropout=0.1,
-                r=16,
-                bias='none',
+                lora_alpha=32,      # LoRA缩放参数
+                lora_dropout=0.1,   # LoRA dropout率
+                r=16,               # LoRA秩
+                bias='none',        # 不训练偏置项
                 task_type="CAUSAL_LM",
-                target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+                target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],  # 目标模块
             )
             model.add_adapter(peft_config, "retrieval")
             print('Add retrieval lora adapter from init')
 
     def _freeze_non_crossattention_parameters(self):
+        """冻结非交叉注意力参数以节省显存"""
         freeze_non_crossattention_parameters(self.model, True, True)
 
     def save_pretrained(self, save_path):
+        """保存模型和tokenizer"""
         self.model.save_pretrained(save_path)
         self.tokenizer.save_pretrained(save_path)
 
     def forward(self, **inputs):
+        """
+        前向传播
+        
+        Args:
+            **inputs: 模型输入（tokenized文本）
+            
+        Returns:
+            torch.Tensor: 文档表示向量
+        """
         outputs = self.model(**inputs)
 
         last_hidden_states = outputs.last_hidden_state
         
-        # use mean token pooling
+        # 使用平均token池化获取文档表示
         pooled_output = mean_token_pool(
             last_hidden_states=last_hidden_states,
             attention_mask=inputs['attention_mask']
@@ -342,6 +421,22 @@ class CrossEncoderModel(torch.nn.Module, BaseModel):
 
 
 class VLMCrossEncoderModel(torch.nn.Module):
+    """
+    VLM交叉编码器模型 - 用于搜索重排序任务
+    
+    主要特点：
+    1. 单塔架构：联合编码查询-文档对
+    2. 多模态输入：支持文本和图像
+    3. 二分类输出：预测查询-文档的相关性
+    4. 支持LoRA微调
+    5. 使用线性分类器进行最终预测
+    
+    模型架构：
+    - 基础模型：Qwen2-VL等视觉语言模型
+    - 特征提取：使用最后一层的隐藏状态
+    - 池化策略：平均token池化
+    - 分类器：线性层 + sigmoid激活
+    """
     def __init__(self, config):
         super().__init__()
         self.config = config

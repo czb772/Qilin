@@ -9,7 +9,7 @@ model:
   load_from_new: false  # Whether to load from the latest checkpoint
   lora_checkpoint_dir: "vlm_checkpoints/"  # LoRA checkpoint save path
   user_lora: true  # Whether to use LoRA
-  load_in_4bit: true  # Whether to load 4-bit model
+  load_in_4bit: false  # Whether to load 4-bit model
   gradient_checkpointing: true  # Enable gradient checkpointing to save GPU memory
 
 # Dataset Configuration
