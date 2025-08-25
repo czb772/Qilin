@@ -1,0 +1,77 @@
+{
+  "query_0": {
+    "query": "如何治疗痘坑？",
+    "ranked_docs": [
+      {
+        "doc_idx": 1,
+        "title": "机器学习基础",
+        "similarity": 1.0
+      },
+      {
+        "doc_idx": 2,
+        "title": "Python编程教程",
+        "similarity": 1.0
+      },
+      {
+        "doc_idx": 3,
+        "title": "美食制作技巧",
+        "similarity": 1.0
+      },
+      {
+        "doc_idx": 0,
+        "title": "痘坑治疗指南",
+        "similarity": 0.99951171875
+      }
+    ]
+  },
+  "query_1": {
+    "query": "什么是机器学习？",
+    "ranked_docs": [
+      {
+        "doc_idx": 0,
+        "title": "痘坑治疗指南",
+        "similarity": 1.0
+      },
+      {
+        "doc_idx": 1,
+        "title": "机器学习基础",
+        "similarity": 1.0
+      },
+      {
+        "doc_idx": 2,
+        "title": "Python编程教程",
+        "similarity": 1.0
+      },
+      {
+        "doc_idx": 3,
+        "title": "美食制作技巧",
+        "similarity": 1.0
+      }
+    ]
+  },
+  "query_2": {
+    "query": "Python编程入门",
+    "ranked_docs": [
+      {
+        "doc_idx": 0,
+        "title": "痘坑治疗指南",
+        "similarity": 1.0
+      },
+      {
+        "doc_idx": 1,
+        "title": "机器学习基础",
+        "similarity": 1.0
+      },
+      {
+        "doc_idx": 2,
+        "title": "Python编程教程",
+        "similarity": 1.0
+      },
+      {
+        "doc_idx": 3,
+        "title": "美食制作技巧",
+        "similarity": 1.0
+      }
+    ]
+  }
+}
